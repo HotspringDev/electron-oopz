@@ -1,6 +1,6 @@
 name: Build/release
 
-on: 
+on:
   workflow_dispatch:
   push:
 
@@ -9,81 +9,41 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
 
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install Node.js and npm
-        uses: actions/setup-node@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install required tools (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ruby ruby-dev build-essential
-          sudo gem install fpm
-          sudo apt install zstd
-          sudo apt-get install --no-install-recommends -y libarchive-tools
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build/release Electron app
         uses: samuelmeuli/action-electron-builder@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Prevent samuelmeuli action from running npm build twice
+          build_script: false
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Upload build artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: electron-build-windows
-          path: dist/**/*exe
-
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-build-linux-deb
-          path: dist/**/*deb
-          
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-build
-          path: dist/**/*
-
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-build-linux-rpm
-          path: dist/**/*rpm
-
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-build-linux-AppImage
-          path: dist/**/*AppImage
-
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-build-macos
-          path: dist/**/*dmg
-
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-build-pacman
-          path: dist/**/*pacman
+          name: electron-build-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.pacman
+          retention-days: 7
