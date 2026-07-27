@@ -1,9 +1,28 @@
 const { app } = require("electron");
 const MainController = require("./controller/main-controller");
 
-class ElectronWechat {
+// ================= Performance & Memory Optimization Flags =================
+
+// 1. Optimize V8 engine GC & limit heap size for single renderer process (e.g., set cap to 512MB to trigger GC earlier)
+app.commandLine.appendSwitch("js-flags", "--expose-gc --max-old-space-size=512");
+
+// 2. Disable unused background services and component update checks
+app.commandLine.appendSwitch("disable-component-update");
+app.commandLine.appendSwitch("disable-background-networking");
+app.commandLine.appendSwitch("disable-breakpad"); // Disable crash dump reporting
+
+// 3. Optimize Linux/Wayland compatibility and rendering overhead
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+  app.commandLine.appendSwitch("enable-features", "WaylandWindowDecorations");
+}
+
+// =========================================================================
+
+class ElectronOopz {
   constructor() {
     this.mainController = null;
+    this.gcInterval = null;
   }
 
   // init method, the entry point of the app.
@@ -16,52 +35,51 @@ class ElectronWechat {
         if (this.mainController) this.mainController.show();
       });
 
-      this.initApp();
+        this.initApp();
     }
   }
 
   // init the main app.
   initApp() {
-    // This method will be called when Electron has finished initialization and is
-    // ready to create browser windows. Some APIs can only be used after this event
-    // occurs.
     app.on("ready", () => {
       this.mainController = new MainController();
+
+      // Periodically trigger main process V8 garbage collection every 15 minutes to prevent memory leaks
+      this.gcInterval = setInterval(() => {
+        if (global.gc) {
+          try {
+            global.gc();
+          } catch (e) {
+            console.error("GC Execution failed:", e);
+          }
+        }
+      }, 15 * 60 * 1000);
     });
 
-    // Quit when all windows are closed.
     app.on("window-all-closed", () => {
-      // On OS X it is common for applications and their menu bar to stay active until
-      // the user quits explicitly with Cmd + Q
-      // if (process.platform !== "darwin") {
-      //     app.quit();
-      // }
       app.quit();
     });
 
     app.on("quit", () => {
-      // empty cover cache folder before exit.
-      // fs.remove(`${app.getPath('userData')}/covers`);
+      if (this.gcInterval) clearInterval(this.gcInterval);
     });
 
-    app.on("activate", () => {
-      // On OS X it's common to re-create a window in the app when the dock icon is
-      // clicked and there are no other windows open.
-      if (this.mainController === null) {
-        this.mainController = new MainController();
-      } else {
-        this.mainController.show();
-      }
-    });
-    app.on(
-      "certificate-error",
-      function (event, webContents, url, error, certificate, callback) {
-        event.preventDefault();
-        console.log("certificate-error");
-        callback(true);
-      }
-    );
+      app.on("activate", () => {
+        if (this.mainController === null) {
+          this.mainController = new MainController();
+        } else {
+          this.mainController.show();
+        }
+      });
+
+      app.on(
+        "certificate-error",
+        function (event, webContents, url, error, certificate, callback) {
+          event.preventDefault();
+          callback(true);
+        }
+      );
   }
 }
 
-new ElectronWechat().init();
+new ElectronOopz().init();
