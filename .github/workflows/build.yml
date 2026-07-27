@@ -22,6 +22,13 @@ jobs:
         with:
           node-version: 22
 
+      # 仅安装 pacman 打包必需的 bsdtar（耗时小于 2 秒）
+      - name: Install pacman packaging dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libarchive-tools
+
       - name: Install dependencies
         run: npm install
 
@@ -29,8 +36,8 @@ jobs:
         uses: samuelmeuli/action-electron-builder@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Prevent samuelmeuli action from running npm build twice
-          build_script: false
+          # 禁用 action 内部自动重复执行 npm run build
+          skip_build: true
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Upload build artifacts
